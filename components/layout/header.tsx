@@ -18,7 +18,9 @@ import {
   Brain,
   Calendar,
   Dumbbell,
-  MessageSquare
+  MessageSquare,
+  Video,
+  Map
 } from "lucide-react";
 
 const navItems = [
@@ -27,8 +29,10 @@ const navItems = [
   { name: "Analysis", href: "/analysis", icon: BarChart2 },
   { name: "Symptom Checker", href: "/symptom-checker", icon: Stethoscope },
   { name: "Doctor Appointments", href: "/doctor-appointments", icon: Calendar },
+  { name: "VR Doctor", href: "/vr-doctor", icon: Video },
   { name: "Mental Wellness", href: "/mental-wellness", icon: Brain },
   { name: "Fitness Tracker", href: "/fitness-tracker", icon: Dumbbell },
+  { name: "Maps", href: "/maps", icon: Map },
   { name: "Learning Center", href: "/learning-center", icon: BookOpen },
 ];
 

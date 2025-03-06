@@ -9,6 +9,49 @@ import { generateFitnessResponse } from "@/lib/fitnessRecommendations";
 import { generateMentalWellnessResponse } from "@/lib/mentalWellnessRecommendations";
 import { saveAs } from "file-saver";
 import { jsPDF } from "jspdf";
+import { 
+  speakText, 
+  speakLongText, 
+  stopSpeaking, 
+  initSpeechSynthesis, 
+  isSpeechSynthesisActive,
+  setSpeechRate,
+  setSpeechPitch,
+  setSpeechVolume
+} from "@/lib/speechService";
+import { Volume2, VolumeX, PlayCircle, StopCircle, Settings } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Send, Loader2, Trash, Mic, MicOff, Copy, Download, Check } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 
 type Message = {
   id: string;
@@ -34,6 +77,18 @@ type GeminiAssistantContextType = {
   copyToClipboard: (text: string) => void;
   downloadChatAsPDF: () => void;
   isCopied: boolean;
+  // Text-to-speech properties
+  isSpeaking: boolean;
+  textToSpeechEnabled: boolean;
+  toggleTextToSpeech: () => void;
+  speakMessage: (text: string) => void;
+  stopSpeaking: () => void;
+  speechRate: number;
+  setSpeechRate: (rate: number) => void;
+  speechPitch: number;
+  setSpeechPitch: (pitch: number) => void;
+  speechVolume: number;
+  setSpeechVolume: (volume: number) => void;
 };
 
 const GeminiAssistantContext = createContext<GeminiAssistantContextType | undefined>(undefined);
@@ -59,6 +114,11 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(true);
+  const [speechRate, setSpeechRateState] = useState(1.0);
+  const [speechPitch, setSpeechPitchState] = useState(1.0);
+  const [speechVolume, setSpeechVolumeState] = useState(1.0);
   
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -177,6 +237,24 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Initialize speech synthesis when component mounts
+  useEffect(() => {
+    const initSpeech = async () => {
+      await initSpeechSynthesis();
+    };
+    
+    initSpeech();
+  }, []);
+  
+  // Check speaking status periodically to update the UI
+  useEffect(() => {
+    const checkSpeakingInterval = setInterval(() => {
+      setIsSpeaking(isSpeechSynthesisActive());
+    }, 200);
+    
+    return () => clearInterval(checkSpeakingInterval);
+  }, []);
+
   const startListening = () => {
     setTranscript('');
     if (recognitionRef.current) {
@@ -276,6 +354,50 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
     doc.save("echomed-chat.pdf");
   };
 
+  // Toggle text-to-speech setting
+  const toggleTextToSpeech = () => {
+    if (textToSpeechEnabled) {
+      stopSpeaking();
+    }
+    setTextToSpeechEnabled(!textToSpeechEnabled);
+  };
+  
+  // Speak text and manage state
+  const speakMessage = (text: string) => {
+    if (!textToSpeechEnabled) return;
+    
+    stopSpeaking();
+    setIsSpeaking(true);
+    speakLongText(text);
+    
+    // Safety fallback - check if speaking ended
+    setTimeout(() => {
+      setIsSpeaking(isSpeechSynthesisActive());
+    }, 1000);
+  };
+  
+  // Update speech settings
+  const handleSetSpeechRate = (rate: number) => {
+    setSpeechRateState(rate);
+    setSpeechRate(rate);
+  };
+  
+  const handleSetSpeechPitch = (pitch: number) => {
+    setSpeechPitchState(pitch);
+    setSpeechPitch(pitch);
+  };
+  
+  const handleSetSpeechVolume = (volume: number) => {
+    setSpeechVolumeState(volume);
+    setSpeechVolume(volume);
+  };
+  
+  // Stop speaking
+  const handleStopSpeaking = () => {
+    stopSpeaking();
+    setIsSpeaking(false);
+  };
+
   const sendMessage = async (message: string) => {
     // Add user message
     const userMessage: Message = {
@@ -315,6 +437,12 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
         
         setMessages((prev) => [...prev, aiMessage]);
         setIsTyping(false);
+        
+        // Speak the response if text-to-speech is enabled
+        if (textToSpeechEnabled) {
+          speakMessage(fitnessResponse);
+        }
+        
         return;
       }
       
@@ -343,6 +471,12 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
         
         setMessages((prev) => [...prev, aiMessage]);
         setIsTyping(false);
+        
+        // Speak the response if text-to-speech is enabled
+        if (textToSpeechEnabled) {
+          speakMessage(wellnessResponse);
+        }
+        
         return;
       }
       
@@ -387,6 +521,11 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
       };
       
       setMessages((prev) => [...prev, aiMessage]);
+      
+      // Speak the response if text-to-speech is enabled
+      if (textToSpeechEnabled) {
+        speakMessage(finalResponse);
+      }
     } catch (error) {
       console.error("Error in sendMessage:", error);
       
@@ -399,55 +538,56 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
       };
       
       setMessages((prev) => [...prev, errorMessage]);
+      
+      // Speak the error message if text-to-speech is enabled
+      if (textToSpeechEnabled) {
+        speakMessage(errorMessage.content);
+      }
     } finally {
       setIsTyping(false);
     }
   };
 
+  const contextValue: GeminiAssistantContextType = {
+    isOpen,
+    messages,
+    openAssistant,
+    closeAssistant,
+    sendMessage,
+    isTyping,
+    clearMessages,
+    currentResponse,
+    isListening,
+    startListening,
+    stopListening,
+    transcript,
+    setTranscript,
+    copyToClipboard,
+    downloadChatAsPDF,
+    isCopied,
+    // Text-to-speech functionality
+    isSpeaking,
+    textToSpeechEnabled,
+    toggleTextToSpeech,
+    speakMessage,
+    stopSpeaking: handleStopSpeaking,
+    speechRate,
+    setSpeechRate: handleSetSpeechRate,
+    speechPitch,
+    setSpeechPitch: handleSetSpeechPitch,
+    speechVolume,
+    setSpeechVolume: handleSetSpeechVolume
+  };
+
   return (
     <GeminiAssistantContext.Provider
-      value={{
-        isOpen,
-        messages,
-        openAssistant,
-        closeAssistant,
-        sendMessage,
-        isTyping,
-        clearMessages,
-        currentResponse,
-        isListening,
-        startListening,
-        stopListening,
-        transcript,
-        setTranscript,
-        copyToClipboard,
-        downloadChatAsPDF,
-        isCopied
-      }}
+      value={contextValue}
     >
       {children}
       {isOpen && <GeminiAssistantDialog />}
     </GeminiAssistantContext.Provider>
   );
 }
-
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Send, Loader2, Trash2, Mic, MicOff, Copy, Download, Check, Volume2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function GeminiAssistantDialog() {
   const { 
@@ -464,7 +604,19 @@ function GeminiAssistantDialog() {
     setTranscript,
     copyToClipboard,
     downloadChatAsPDF,
-    isCopied
+    isCopied,
+    // Text-to-speech properties
+    isSpeaking,
+    textToSpeechEnabled,
+    toggleTextToSpeech,
+    speakMessage,
+    stopSpeaking,
+    speechRate,
+    setSpeechRate,
+    speechPitch,
+    setSpeechPitch,
+    speechVolume,
+    setSpeechVolume
   } = useGeminiAssistant();
   
   const [inputValue, setInputValue] = useState("");
@@ -533,6 +685,96 @@ function GeminiAssistantDialog() {
               </div>
             </div>
             <div className="flex items-center space-x-1">
+              {/* Text-to-speech toggle button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-primary-foreground opacity-80 hover:opacity-100"
+                      onClick={toggleTextToSpeech}
+                    >
+                      {textToSpeechEnabled ? 
+                        <Volume2 className="h-4 w-4" /> : 
+                        <VolumeX className="h-4 w-4" />
+                      }
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{textToSpeechEnabled ? "Disable voice" : "Enable voice"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              {/* Voice settings */}
+              {textToSpeechEnabled && (
+                <Popover>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <PopoverTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-primary-foreground opacity-80 hover:opacity-100"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
+                        </PopoverTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Voice settings</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <PopoverContent className="w-72">
+                    <div className="space-y-4 p-2">
+                      <h4 className="font-medium text-sm">Voice Settings</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Speed</span>
+                          <span className="text-sm text-muted-foreground">{speechRate.toFixed(1)}x</span>
+                        </div>
+                        <Slider 
+                          value={[speechRate]} 
+                          min={0.5} 
+                          max={2} 
+                          step={0.1} 
+                          onValueChange={(value) => setSpeechRate(value[0])} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Pitch</span>
+                          <span className="text-sm text-muted-foreground">{speechPitch.toFixed(1)}</span>
+                        </div>
+                        <Slider 
+                          value={[speechPitch]} 
+                          min={0.5} 
+                          max={1.5} 
+                          step={0.1} 
+                          onValueChange={(value) => setSpeechPitch(value[0])} 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-sm">Volume</span>
+                          <span className="text-sm text-muted-foreground">{(speechVolume * 100).toFixed(0)}%</span>
+                        </div>
+                        <Slider 
+                          value={[speechVolume]} 
+                          min={0} 
+                          max={1} 
+                          step={0.1} 
+                          onValueChange={(value) => setSpeechVolume(value[0])} 
+                        />
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -554,29 +796,28 @@ function GeminiAssistantDialog() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Clear conversation history?</AlertDialogTitle>
+                    <AlertDialogTitle>Clear conversation?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete your conversation history with Dr. Echo.
+                      This will remove all messages in this conversation. This action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={clearMessages}>Clear history</AlertDialogAction>
+                    <AlertDialogAction onClick={clearMessages}>Continue</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
               
-              <Button variant="ghost" size="icon" onClick={closeAssistant} className="text-primary-foreground opacity-80 hover:opacity-100">
+              <Button variant="ghost" size="icon" className="text-primary-foreground opacity-80 hover:opacity-100" onClick={closeAssistant}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
           </motion.div>
           
-          <ScrollArea className="flex-1 p-4 overflow-y-auto">
-            <motion.div 
-              className="space-y-6"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+          <ScrollArea className="flex-1 p-4 space-y-4">
+            <motion.div
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
             >
               {displayMessages.map((message, index) => (
@@ -608,6 +849,25 @@ function GeminiAssistantDialog() {
                         
                         {message.role === "assistant" && (
                           <div className="flex space-x-1">
+                            {/* Text-to-speech play/stop button for messages */}
+                            {textToSpeechEnabled && (
+                              <button 
+                                onClick={() => {
+                                  if (isSpeaking) {
+                                    stopSpeaking();
+                                  } else {
+                                    speakMessage(message.content);
+                                  }
+                                }}
+                                className="opacity-70 hover:opacity-100 transition-opacity"
+                                aria-label={isSpeaking ? "Stop speaking" : "Read aloud"}
+                              >
+                                {isSpeaking ? 
+                                  <StopCircle className="h-3 w-3" /> : 
+                                  <PlayCircle className="h-3 w-3" />
+                                }
+                              </button>
+                            )}
                             <button 
                               onClick={() => copyToClipboard(message.content)}
                               className="opacity-70 hover:opacity-100 transition-opacity"
@@ -629,14 +889,15 @@ function GeminiAssistantDialog() {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex justify-start"
                 >
-                  <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-muted shadow-sm">
+                  <div className="bg-muted rounded-2xl px-4 py-3 shadow-sm max-w-[85%]">
                     {currentResponse ? (
                       <div>
-                        <p className="text-sm whitespace-pre-wrap">{currentResponse}</p>
-                        <div className="h-3 w-3 mt-1">
-                          <span className="inline-block h-1 w-1 rounded-full bg-primary animate-bounce mr-0.5" style={{ animationDelay: "0ms" }}></span>
-                          <span className="inline-block h-1 w-1 rounded-full bg-primary animate-bounce mr-0.5" style={{ animationDelay: "150ms" }}></span>
-                          <span className="inline-block h-1 w-1 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                        <div className="text-sm whitespace-pre-wrap">
+                          {currentResponse}
+                        </div>
+                        <div className="flex items-center mt-2 text-xs opacity-70">
+                          <Loader2 className="animate-spin h-3 w-3 mr-1" />
+                          <span>Thinking...</span>
                         </div>
                       </div>
                     ) : (
@@ -657,7 +918,7 @@ function GeminiAssistantDialog() {
             initial={{ y: 10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="p-4 border-t bg-background"
+            className="p-4 border-t"
           >
             <form onSubmit={handleSubmit} className="flex space-x-2">
               <div className="relative flex-1">
@@ -666,53 +927,30 @@ function GeminiAssistantDialog() {
                   value={isListening ? transcript : inputValue}
                   onChange={(e) => isListening ? setTranscript(e.target.value) : setInputValue(e.target.value)}
                   placeholder="Type your health question..."
-                  className={`pr-10 ${isListening ? 'border-primary' : ''}`}
+                  className="w-full"
                   disabled={isTyping}
                 />
                 {isListening && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                    <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                   </div>
                 )}
               </div>
               
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      type="button" 
-                      size="icon" 
-                      variant={isListening ? "destructive" : "outline"}
-                      onClick={isListening ? stopListening : startListening}
-                      disabled={isTyping}
-                      className={isListening ? "animate-pulse" : ""}
-                    >
-                      {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{isListening ? "Stop voice input" : "Start voice input"}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
               <Button 
-                type="submit" 
+                type="button" 
                 size="icon" 
-                disabled={isTyping || (!inputValue.trim() && !transcript.trim())}
-                className="bg-primary hover:bg-primary/90"
+                variant={isListening ? "destructive" : "outline"}
+                onClick={isListening ? stopListening : startListening}
+                disabled={isTyping}
               >
-                {isTyping ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
+                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+              </Button>
+              
+              <Button type="submit" disabled={isTyping || (!inputValue.trim() && !transcript.trim())}>
+                <Send className="h-4 w-4" />
               </Button>
             </form>
-            
-            <div className="mt-2 text-xs text-center text-muted-foreground">
-              <p>Ask me about your health, symptoms, or wellness recommendations</p>
-            </div>
           </motion.div>
         </div>
       </motion.div>

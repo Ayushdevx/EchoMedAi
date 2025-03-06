@@ -6,6 +6,25 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Download, Mic, MicOff, Send, Image, File, X, Plus, Trash2, Heart, ThumbsUp, ThumbsDown, Bookmark } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Stethoscope, Paperclip, ChevronDown, Volume2, VolumeX, PlayCircle, StopCircle, Settings } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
+import { 
+  speakText, 
+  speakLongText, 
+  stopSpeaking, 
+  initSpeechSynthesis, 
+  isSpeechSynthesisActive,
+  setSpeechRate as setTTSRate,
+  setSpeechPitch as setTTSPitch,
+  setSpeechVolume as setTTSVolume
+} from '@/lib/speechService';
 
 type Message = {
   id: string;
@@ -53,7 +72,15 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
   const recognition = useRef<any>(null);
   const [theme, setTheme] = useState<'blue' | 'teal' | 'purple'>('blue');
   
-  // Initialize speech recognition
+  // Add text-to-speech state
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [textToSpeechEnabled, setTextToSpeechEnabled] = useState(true);
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechPitch, setSpeechPitch] = useState(1.0);
+  const [speechVolume, setSpeechVolume] = useState(1.0);
+  const [activeSpeakingMessageId, setActiveSpeakingMessageId] = useState<string | null>(null);
+  
+  // Initialize speech recognition and synthesis
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -63,23 +90,164 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
         recognition.current.interimResults = true;
         recognition.current.lang = 'en-US';
         
+        // Set a longer timeout for speech detection
+        recognition.current.speechRecognitionTimeout = 10000; // 10 seconds
+        
+        recognition.current.onstart = () => {
+          setIsListening(true);
+          toast.success("Voice input started - Please start speaking");
+        };
+        
+        recognition.current.onend = () => {
+          // If we're still marked as listening when onend fires, 
+          // it means it ended unexpectedly, so try to restart
+          if (isListening) {
+            try {
+              recognition.current?.start();
+            } catch (err) {
+              console.error('Error restarting recognition:', err);
+              setIsListening(false);
+            }
+          } else {
+            setIsListening(false);
+          }
+        };
+        
+        recognition.current.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          
+          // Handle specific error cases
+          switch (event.error) {
+            case 'no-speech':
+              toast.error("No speech detected. Please try speaking again or check your microphone.");
+              // Don't stop listening, just notify the user
+              return;
+            case 'audio-capture':
+              toast.error("No microphone detected. Please check your microphone connection.");
+              break;
+            case 'not-allowed':
+              toast.error("Microphone access denied. Please allow microphone access in your browser settings.");
+              break;
+            case 'network':
+              toast.error("Network error occurred. Please check your internet connection.");
+              break;
+            default:
+              toast.error("Voice input error: " + event.error);
+          }
+          
+          setIsListening(false);
+        };
+        
         recognition.current.onresult = (event: any) => {
-          const transcript = Array.from(event.results)
-            .map((result: any) => result[0])
-            .map((result) => result.transcript)
-            .join('');
-            
-          setInputValue(transcript);
+          let finalTranscript = '';
+          let interimTranscript = '';
+          
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+          
+          // Update input value with both final and interim results
+          setInputValue(prevValue => {
+            const newValue = finalTranscript || interimTranscript;
+            return newValue || prevValue;
+          });
+        };
+        
+        // Add nomatch handler
+        recognition.current.onnomatch = () => {
+          toast.error("Could not understand speech. Please try speaking more clearly.");
         };
       }
     }
     
+    // Initialize speech synthesis
+    const initSpeech = async () => {
+      await initSpeechSynthesis();
+    };
+    initSpeech();
+    
     return () => {
       if (recognition.current) {
-        recognition.current.stop();
+        try {
+          recognition.current.stop();
+        } catch (err) {
+          console.error('Error stopping recognition:', err);
+        }
       }
+      stopSpeaking();
     };
-  }, []);
+  }, [isListening]);
+  
+  // Check speaking status periodically to update the UI
+  useEffect(() => {
+    const checkSpeakingInterval = setInterval(() => {
+      const currentlySpeaking = isSpeechSynthesisActive();
+      setIsSpeaking(currentlySpeaking);
+      
+      // If speech has stopped, clear the active message
+      if (!currentlySpeaking && isSpeaking) {
+        setActiveSpeakingMessageId(null);
+      }
+    }, 200);
+    
+    return () => clearInterval(checkSpeakingInterval);
+  }, [isSpeaking]);
+  
+  // Toggle text-to-speech setting
+  const toggleTextToSpeech = () => {
+    if (textToSpeechEnabled) {
+      stopSpeaking();
+      setActiveSpeakingMessageId(null);
+    }
+    setTextToSpeechEnabled(!textToSpeechEnabled);
+    toast.success(textToSpeechEnabled ? "Voice output disabled" : "Voice output enabled");
+  };
+  
+  // Speak text and manage state
+  const speakMessage = (text: string, messageId: string) => {
+    if (!textToSpeechEnabled) return;
+    
+    // If we're already speaking this message, stop it
+    if (activeSpeakingMessageId === messageId) {
+      stopSpeaking();
+      setActiveSpeakingMessageId(null);
+      return;
+    }
+    
+    // Otherwise, stop any current speech and start speaking this message
+    stopSpeaking();
+    setIsSpeaking(true);
+    setActiveSpeakingMessageId(messageId);
+    speakLongText(text);
+  };
+  
+  // Update speech settings with feedback
+  const handleSetSpeechRate = (rate: number) => {
+    setSpeechRate(rate);
+    setTTSRate(rate);
+  };
+  
+  const handleSetSpeechPitch = (pitch: number) => {
+    setSpeechPitch(pitch);
+    setTTSPitch(pitch);
+  };
+  
+  const handleSetSpeechVolume = (volume: number) => {
+    setSpeechVolume(volume);
+    setTTSVolume(volume);
+  };
+  
+  // Stop speaking
+  const handleStopSpeaking = () => {
+    stopSpeaking();
+    setIsSpeaking(false);
+    setActiveSpeakingMessageId(null);
+  };
   
   // Auto-scroll to the bottom when messages change
   useEffect(() => {
@@ -88,22 +256,40 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
 
   const toggleListening = () => {
     if (isListening) {
-      recognition.current?.stop();
-      setIsListening(false);
+      try {
+        recognition.current?.stop();
+        setIsListening(false);
+        toast.success("Voice input stopped");
+      } catch (error) {
+        console.error("Error stopping speech recognition:", error);
+        toast.error("Error stopping voice input");
+      }
     } else {
       try {
+        setInputValue(''); // Clear previous input
         recognition.current?.start();
-        setIsListening(true);
-        toast.success("Voice recording started");
+        toast.success("Voice input started - Speak now", {
+          description: "If no speech is detected, try speaking louder or check your microphone settings."
+        });
       } catch (error) {
         console.error("Error starting speech recognition:", error);
-        toast.error("Couldn't access microphone");
+        toast.error("Couldn't access microphone. Please check your browser permissions.");
+        setIsListening(false);
       }
     }
   };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() && attachments.length === 0) return;
+    
+    // Stop listening if active
+    if (isListening) {
+      try {
+        recognition.current?.stop();
+      } catch (err) {
+        console.error('Error stopping recognition:', err);
+      }
+    }
     
     // Create attachment objects for the message
     const messageAttachments = attachments.map(att => ({
@@ -125,11 +311,6 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
     setInputValue('');
     setIsTyping(true);
     setAttachments([]);
-    
-    if (isListening) {
-      recognition.current?.stop();
-      setIsListening(false);
-    }
     
     // Create temporary message for typing effect
     const tempId = 'typing-' + Date.now();
@@ -165,25 +346,39 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
         }
       );
       
-      // Update with final message
+      // Update with final message and assign a proper ID
+      const finalMessageId = 'response-' + Date.now();
       setMessages((prev) => 
         prev.map((msg) => 
-          msg.id === tempId ? { ...msg, id: 'response-' + Date.now() } : msg
+          msg.id === tempId ? { ...msg, id: finalMessageId } : msg
         )
       );
+      
+      // Speak the response if text-to-speech is enabled
+      if (textToSpeechEnabled) {
+        speakMessage(finalResponse, finalMessageId);
+      }
     } catch (error) {
       console.error("Error getting AI response:", error);
       
       // Update with error message
+      const errorMessageId = 'error-' + Date.now();
+      const errorContent = "I'm sorry, I encountered an error. Please try again later.";
+      
       setMessages((prev) => 
         prev.map((msg) => 
           msg.id === tempId ? { 
             ...msg, 
-            id: 'error-' + Date.now(),
-            content: "I'm sorry, I encountered an error. Please try again later."
+            id: errorMessageId,
+            content: errorContent
           } : msg
         )
       );
+      
+      // Speak the error message if text-to-speech is enabled
+      if (textToSpeechEnabled) {
+        speakMessage(errorContent, errorMessageId);
+      }
     } finally {
       setIsTyping(false);
     }
