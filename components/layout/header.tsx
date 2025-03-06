@@ -20,6 +20,8 @@ import {
   Dumbbell,
   MessageSquare,
   Video,
+  FileText,
+  Youtube,
   Map
 } from "lucide-react";
 
@@ -30,6 +32,8 @@ const navItems = [
   { name: "Symptom Checker", href: "/symptom-checker", icon: Stethoscope },
   { name: "Doctor Appointments", href: "/doctor-appointments", icon: Calendar },
   { name: "VR Doctor", href: "/vr-doctor", icon: Video },
+  { name: "Patient Report Analysis", href: "/patient-report", icon: FileText },
+  { name: "Health Hub", href: "/health-hub", icon: Youtube },
   { name: "Mental Wellness", href: "/mental-wellness", icon: Brain },
   { name: "Fitness Tracker", href: "/fitness-tracker", icon: Dumbbell },
   { name: "Maps", href: "/maps", icon: Map },

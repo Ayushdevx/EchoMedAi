@@ -19,7 +19,7 @@ import {
   setSpeechPitch,
   setSpeechVolume
 } from "@/lib/speechService";
-import { Volume2, VolumeX, PlayCircle, StopCircle, Settings } from "lucide-react";
+import { Volume2, VolumeX, PlayCircle, StopCircle, Settings, Trash2 } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -52,7 +52,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Loader2, Trash, Mic, MicOff, Copy, Download, Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { toast } from 'sonner';
 
+// Component types
 type Message = {
   id: string;
   role: "user" | "assistant" | "system";
@@ -120,7 +122,8 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
   const [speechPitch, setSpeechPitchState] = useState(1.0);
   const [speechVolume, setSpeechVolumeState] = useState(1.0);
   
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // Use a more generic type that covers our use cases without requiring specific SpeechRecognition interface
+  const recognitionRef = useRef<any>(null);
 
   // Test the API connection when the component mounts
   useEffect(() => {
@@ -199,12 +202,13 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
+      // Add type assertions to handle the TypeScript error
+      const SpeechRecognitionConstructor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognitionConstructor();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       
-      recognitionRef.current.onresult = (event) => {
+      recognitionRef.current.onresult = (event: any) => {
         let interimTranscript = '';
         let finalTranscript = '';
         
@@ -220,12 +224,12 @@ export function GeminiAssistantProvider({ children }: { children: ReactNode }) {
         setTranscript(prev => prev + finalTranscript + interimTranscript);
       };
       
-      recognitionRef.current.onerror = (event) => {
+      recognitionRef.current.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
         setIsListening(false);
       };
       
-      recognitionRef.current.onend = () => {
+      recognitionRef.current.onend = (event: any) => {
         setIsListening(false);
       };
     }

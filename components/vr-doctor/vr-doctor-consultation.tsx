@@ -119,9 +119,21 @@ export default function VRDoctorConsultation() {
           // Handle specific error cases
           switch (event.error) {
             case 'no-speech':
-              toast.error("No speech detected. Please try speaking again.");
-              // Don't stop listening, just notify the user
+              // Show a gentle reminder instead of an error
+              toast.info("I didn't catch that. Please try speaking again or type your message.");
+              
+              // Don't stop listening, just restart after a short delay
+              setTimeout(() => {
+                try {
+                  if (isListening) {
+                    recognition.current?.start();
+                  }
+                } catch (err) {
+                  console.error('Error restarting recognition:', err);
+                }
+              }, 100);
               return;
+              
             case 'audio-capture':
               toast.error("No microphone detected. Please check your microphone connection.");
               break;

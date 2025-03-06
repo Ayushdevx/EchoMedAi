@@ -101,7 +101,7 @@ export function ResultsDisplay() {
                   <Progress 
                     value={analysisResults.primaryCondition.confidence} 
                     className="h-2"
-                    indicatorColor={analysisResults.primaryCondition.status === "normal" ? "bg-success" : "bg-warning"}
+                    indicatorClassName={analysisResults.primaryCondition.status === "normal" ? "bg-success" : "bg-warning"}
                   />
                 </div>
               </div>
