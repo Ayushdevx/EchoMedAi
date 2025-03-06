@@ -1,0 +1,1441 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { 
+  Brain, 
+  Calendar, 
+  Clock, 
+  Download, 
+  Heart, 
+  LineChart, 
+  Moon, 
+  Play, 
+  PauseCircle,
+  RefreshCw, 
+  Save, 
+  Sun, 
+  Volume2,
+  Waves,
+  Check,
+  CalendarDays,
+  AlertCircle,
+  Sparkles,
+  ScrollText,
+  Trash2,
+  Edit2,
+  Archive
+} from "lucide-react";
+import { useGeminiAssistant } from "@/components/ai-assistant/gemini-assistant-provider";
+import { generateMentalWellnessResponse } from "@/lib/mentalWellnessRecommendations";
+import { MoodTrends } from "@/components/mental-wellness/mood-trends";
+import { MoodPatterns } from "@/components/mental-wellness/mood-patterns";
+import { AIInsights } from "@/components/mental-wellness/ai-insights";
+import { WellnessDashboard } from "@/components/mental-wellness/wellness-dashboard";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+// Define mood tags array once to avoid duplication
+const moodTagsData = [
+  // Positive emotions - blues & purples (primary colors in the app)
+  { name: "Happy", color: "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20" },
+  { name: "Joyful", color: "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200 dark:hover:bg-indigo-950/60" },
+  { name: "Calm", color: "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-950/60" },
+  { name: "Relaxed", color: "bg-sky-100 dark:bg-sky-950/40 text-sky-600 dark:text-sky-300 border-sky-200 dark:border-sky-800 hover:bg-sky-200 dark:hover:bg-sky-950/60" },
+  { name: "Peaceful", color: "bg-cyan-100 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800 hover:bg-cyan-200 dark:hover:bg-cyan-950/60" },
+  
+  // Neutral emotions - teals & greens
+  { name: "Content", color: "bg-teal-100 dark:bg-teal-950/40 text-teal-600 dark:text-teal-300 border-teal-200 dark:border-teal-800 hover:bg-teal-200 dark:hover:bg-teal-950/60" },
+  { name: "Hopeful", color: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-200 dark:hover:bg-emerald-950/60" },
+  { name: "Grateful", color: "bg-green-100 dark:bg-green-950/40 text-green-600 dark:text-green-300 border-green-200 dark:border-green-800 hover:bg-green-200 dark:hover:bg-green-950/60" },
+  { name: "Inspired", color: "bg-violet-100 dark:bg-violet-950/40 text-violet-600 dark:text-violet-300 border-violet-200 dark:border-violet-800 hover:bg-violet-200 dark:hover:bg-violet-950/60" },
+  
+  // Energetic emotions - warm colors
+  { name: "Energetic", color: "bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-200 dark:hover:bg-amber-950/60" },
+  { name: "Motivated", color: "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-300 border-orange-200 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-950/60" },
+  { name: "Excited", color: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-600 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 hover:bg-yellow-200 dark:hover:bg-yellow-950/60" },
+  
+  // Negative emotions - reds & pinks
+  { name: "Anxious", color: "bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-800 hover:bg-rose-200 dark:hover:bg-rose-950/60" },
+  { name: "Nervous", color: "bg-pink-100 dark:bg-pink-950/40 text-pink-600 dark:text-pink-300 border-pink-200 dark:border-pink-800 hover:bg-pink-200 dark:hover:bg-pink-950/60" },
+  { name: "Stressed", color: "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-300 border-red-200 dark:border-red-800 hover:bg-red-200 dark:hover:bg-red-950/60" },
+  { name: "Overwhelmed", color: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-200 dark:hover:bg-red-950/60" },
+  { name: "Frustrated", color: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-200 dark:hover:bg-orange-950/60" },
+  
+  // Sad emotions - blues & indigos
+  { name: "Sad", color: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-200 dark:hover:bg-blue-950/60" },
+  { name: "Gloomy", color: "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-200 dark:hover:bg-indigo-950/60" },
+  
+  // Low energy emotions - grays & slates
+  { name: "Tired", color: "bg-slate-100 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800" },
+  { name: "Exhausted", color: "bg-zinc-100 dark:bg-zinc-800/60 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-800" },
+  
+  // Confusion emotions - neutrals
+  { name: "Confused", color: "bg-stone-100 dark:bg-stone-800/60 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-700 hover:bg-stone-200 dark:hover:bg-stone-800" },
+  { name: "Uncertain", color: "bg-gray-100 dark:bg-gray-800/60 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-800" }
+];
+
+type JournalEntry = {
+  id: string;
+  date: Date;
+  text: string;
+  mood: string[];
+  timeOfDay: "morning" | "afternoon" | "night";
+  emoji: string | null;
+};
+
+export default function MentalWellnessPage() {
+  const { openAssistant, sendMessage } = useGeminiAssistant();
+  const [activeTab, setActiveTab] = useState("assessment");
+  const [moodScore, setMoodScore] = useState<number>(7);
+  const [anxietyLevel, setAnxietyLevel] = useState<number>(3);
+  const [sleepQuality, setSleepQuality] = useState<number>(8);
+  const [energyLevel, setEnergyLevel] = useState<number>(6);
+  const [focusLevel, setFocusLevel] = useState<number>(7);
+  const [journalEntry, setJournalEntry] = useState("");
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [meditationTime, setMeditationTime] = useState(300); // 5 minutes in seconds
+  const [remainingTime, setRemainingTime] = useState(300);
+  const [selectedSound, setSelectedSound] = useState("rain");
+  const [selectedMoodTags, setSelectedMoodTags] = useState<string[]>([]);
+  const [journalCharCount, setJournalCharCount] = useState(0);
+  const [journalSentiment, setJournalSentiment] = useState<'neutral' | 'positive' | 'negative'>('neutral');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
+  const [saveAnimation, setSaveAnimation] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [timeOfDay, setTimeOfDay] = useState<"morning" | "afternoon" | "night">("morning");
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([
+    {
+      id: "entry-1",
+      date: new Date(Date.now() - 86400000), // Yesterday
+      text: "Today was a productive day at work. I managed to complete all my tasks ahead of schedule and had a great team meeting. Feeling accomplished!",
+      mood: ["Calm", "Content"],
+      timeOfDay: "night",
+      emoji: "😌"
+    },
+    {
+      id: "entry-2",
+      date: new Date(Date.now() - 5 * 86400000), // 5 days ago
+      text: "Feeling a bit nervous about the presentation today. I hope it goes well. I've practiced several times but still feel unprepared.",
+      mood: ["Anxious", "Nervous"],
+      timeOfDay: "morning",
+      emoji: "😰"
+    },
+    {
+      id: "entry-3",
+      date: new Date(Date.now() - 7 * 86400000), // 7 days ago
+      text: "Had a wonderful dinner with friends. We talked about our future plans and reminisced about college days. It's been ages since we all got together!",
+      mood: ["Happy", "Joyful"],
+      timeOfDay: "night",
+      emoji: "😊"
+    }
+  ]);
+  const [showAllEntries, setShowAllEntries] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [entryAnimation, setEntryAnimation] = useState<'saving' | 'editing' | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  
+  const moodLabels = {
+    1: "Very Low",
+    3: "Low",
+    5: "Neutral",
+    7: "Good",
+    9: "Excellent"
+  };
+  
+  const anxietyLabels = {
+    1: "None",
+    3: "Mild",
+    5: "Moderate",
+    7: "High",
+    9: "Severe"
+  };
+  
+  const sleepLabels = {
+    1: "Poor",
+    3: "Fair",
+    5: "Average",
+    7: "Good",
+    9: "Excellent"
+  };
+  
+  const energyLabels = {
+    1: "Exhausted",
+    3: "Tired",
+    5: "Neutral",
+    7: "Energetic",
+    9: "Very Energetic"
+  };
+  
+  const focusLabels = {
+    1: "Distracted",
+    3: "Somewhat Focused",
+    5: "Moderately Focused",
+    7: "Focused",
+    9: "Highly Focused"
+  };
+  
+  const getWellnessScore = () => {
+    // Calculate overall wellness score (0-100)
+    const moodWeight = 0.25;
+    const anxietyWeight = 0.25;
+    const sleepWeight = 0.2;
+    const energyWeight = 0.15;
+    const focusWeight = 0.15;
+    
+    // Normalize anxiety (lower is better)
+    const normalizedAnxiety = 10 - anxietyLevel;
+    
+    const score = (
+      (moodScore * moodWeight) +
+      (normalizedAnxiety * anxietyWeight) +
+      (sleepQuality * sleepWeight) +
+      (energyLevel * energyWeight) +
+      (focusLevel * focusWeight)
+    ) * 10;
+    
+    return Math.round(score);
+  };
+  
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  const toggleMeditation = () => {
+    if (isPlaying) {
+      setIsPlaying(false);
+    } else {
+      setIsPlaying(true);
+      
+      // Simulate countdown
+      const interval = setInterval(() => {
+        setRemainingTime(prev => {
+          if (prev <= 1) {
+            clearInterval(interval);
+            setIsPlaying(false);
+            return meditationTime;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
+  
+  const resetMeditation = () => {
+    setIsPlaying(false);
+    setRemainingTime(meditationTime);
+  };
+  
+  const setMeditationDuration = (minutes: number) => {
+    const seconds = minutes * 60;
+    setMeditationTime(seconds);
+    setRemainingTime(seconds);
+  };
+  
+  const handleConsultAI = () => {
+    // Prepare the message for the AI assistant
+    const message = `
+I'd like some mental wellness advice based on my current state:
+
+Mood: ${moodScore}/10 (${Object.entries(moodLabels).find(([key]) => Number(key) === moodScore)?.[1] || 'N/A'})
+Anxiety Level: ${anxietyLevel}/10 (${Object.entries(anxietyLabels).find(([key]) => Number(key) === anxietyLevel)?.[1] || 'N/A'})
+Sleep Quality: ${sleepQuality}/10 (${Object.entries(sleepLabels).find(([key]) => Number(key) === sleepQuality)?.[1] || 'N/A'})
+Energy Level: ${energyLevel}/10 (${Object.entries(energyLabels).find(([key]) => Number(key) === energyLevel)?.[1] || 'N/A'})
+Focus Level: ${focusLevel}/10 (${Object.entries(focusLabels).find(([key]) => Number(key) === focusLevel)?.[1] || 'N/A'})
+
+Journal Entry: ${journalEntry || 'No journal entry provided'}
+
+Based on this information, could you provide some personalized mental wellness recommendations?
+`;
+    
+    // Open the assistant first
+    openAssistant();
+    
+    // Then send the message directly using the provider's sendMessage function
+    // This bypasses the DOM manipulation which could be causing issues
+    setTimeout(() => {
+      sendMessage(message);
+    }, 300);
+  };
+  
+  const wellnessScore = getWellnessScore();
+  
+  const toggleMoodTag = (tagName: string) => {
+    if (selectedMoodTags.includes(tagName)) {
+      setSelectedMoodTags(selectedMoodTags.filter(tag => tag !== tagName));
+    } else {
+      setSelectedMoodTags([...selectedMoodTags, tagName]);
+    }
+  };
+  
+  const analyzeSentiment = (text: string, tags: string[]) => {
+    const positiveWords = ['happy', 'joy', 'great', 'excellent', 'amazing', 'good', 'wonderful', 'love', 'enjoy', 'grateful'];
+    const negativeWords = ['sad', 'upset', 'anxious', 'worried', 'stressed', 'angry', 'frustrated', 'tired', 'bad', 'hard'];
+    
+    // Count occurrences of positive/negative words
+    let positiveCount = 0;
+    let negativeCount = 0;
+    
+    // Check text content
+    const lowerText = text.toLowerCase();
+    positiveWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      const matches = lowerText.match(regex);
+      if (matches) positiveCount += matches.length;
+    });
+    
+    negativeWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'g');
+      const matches = lowerText.match(regex);
+      if (matches) negativeCount += matches.length;
+    });
+    
+    // Factor in mood tags
+    const positiveTags = ['Happy', 'Joyful', 'Calm', 'Relaxed', 'Peaceful', 'Content', 'Hopeful', 'Grateful', 'Inspired', 'Energetic', 'Motivated', 'Excited'];
+    const negativeTags = ['Anxious', 'Nervous', 'Stressed', 'Overwhelmed', 'Frustrated', 'Sad', 'Gloomy', 'Tired', 'Exhausted', 'Confused', 'Uncertain'];
+    
+    tags.forEach(tag => {
+      if (positiveTags.includes(tag)) positiveCount += 2;
+      if (negativeTags.includes(tag)) negativeCount += 2;
+    });
+    
+    // Determine overall sentiment
+    if (positiveCount > negativeCount + 2) return 'positive';
+    if (negativeCount > positiveCount + 2) return 'negative';
+    return 'neutral';
+  };
+  
+  const handleJournalChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    setJournalEntry(text);
+    setJournalCharCount(text.length);
+    
+    // Only analyze sentiment if we have enough text
+    if (text.length > 10) {
+      setJournalSentiment(analyzeSentiment(text, selectedMoodTags));
+    } else {
+      setJournalSentiment('neutral');
+    }
+  };
+  
+  const handleSaveEntry = () => {
+    setSaveAnimation(true);
+    
+    // Only save if there's actual content
+    if (journalEntry.trim().length > 0) {
+      const newEntry: JournalEntry = {
+        id: `entry-${Date.now()}`,
+        date: new Date(),
+        text: journalEntry,
+        mood: selectedMoodTags,
+        timeOfDay: timeOfDay,
+        emoji: selectedEmoji
+      };
+      
+      // Add the new entry to the beginning of the array
+      setJournalEntries(prev => [newEntry, ...prev]);
+      setEntryAnimation('saving');
+      
+      // Trigger confetti effect
+      setShowConfetti(true);
+      
+      // Clear the form after saving
+      setTimeout(() => {
+        setSaveAnimation(false);
+        setJournalEntry("");
+        setSelectedMoodTags([]);
+        if (selectedEmoji) setSelectedEmoji(null);
+        setEntryAnimation(null);
+      }, 1500);
+    } else {
+      // If no content, just reset the animation
+      setTimeout(() => {
+        setSaveAnimation(false);
+      }, 1500);
+    }
+  };
+  
+  const handleEmojiSelect = (emoji: string) => {
+    setSelectedEmoji(emoji);
+    setShowEmojiPicker(false);
+  };
+  
+  const getTimeOfDayInfo = () => {
+    switch(timeOfDay) {
+      case "morning":
+        return { icon: <Sun className="h-5 w-5 text-warning" />, label: "Morning", emoji: "🌅" };
+      case "afternoon":
+        return { icon: <Sun className="h-5 w-5 text-orange-500" />, label: "Afternoon", emoji: "☀️" };
+      case "night":
+        return { icon: <Moon className="h-5 w-5 text-blue-500" />, label: "Night", emoji: "🌙" };
+    }
+  };
+  
+  const formatJournalDate = (date: Date) => {
+    const now = new Date();
+    const today = now.toDateString();
+    const yesterday = new Date(now.getTime() - 86400000).toDateString();
+    const dateString = date.toDateString();
+    
+    if (dateString === today) return "Today";
+    if (dateString === yesterday) return "Yesterday";
+    
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+    });
+  };
+  
+  useEffect(() => {
+    if (showConfetti) {
+      const timeout = setTimeout(() => {
+        setShowConfetti(false);
+      }, 2000);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [showConfetti]);
+  
+  const handleEditEntry = (entryId: string) => {
+    // Find the entry
+    const entryToEdit = journalEntries.find(entry => entry.id === entryId);
+    if (!entryToEdit) return;
+    
+    // Set the entry for editing
+    setJournalEntry(entryToEdit.text);
+    setSelectedMoodTags(entryToEdit.mood);
+    setTimeOfDay(entryToEdit.timeOfDay);
+    if (entryToEdit.emoji) setSelectedEmoji(entryToEdit.emoji);
+    
+    // Set animation state
+    setEntryAnimation('editing');
+    
+    // Switch to journal tab
+    setActiveTab("journal");
+    
+    // Show a short animation
+    setTimeout(() => {
+      setEntryAnimation(null);
+    }, 1500);
+  };
+  
+  const handleDeleteEntry = (entryId: string) => {
+    setJournalEntries(prev => prev.filter(entry => entry.id !== entryId));
+  };
+  
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <h1 className="text-3xl font-bold mb-2">Mental Wellness</h1>
+        <p className="text-muted-foreground mb-8">
+          Track, assess, and improve your mental wellbeing
+        </p>
+      </motion.div>
+      
+      <Tabs defaultValue="assessment" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid grid-cols-4 w-full mb-8">
+          <TabsTrigger value="assessment" className="flex items-center gap-1">
+            <Brain className="h-4 w-4" />
+            Assessment
+          </TabsTrigger>
+          <TabsTrigger value="journal" className="flex items-center gap-1">
+            <LineChart className="h-4 w-4" />
+            Mood Journal
+          </TabsTrigger>
+          <TabsTrigger value="meditation" className="flex items-center gap-1">
+            <Waves className="h-4 w-4" />
+            Meditation
+          </TabsTrigger>
+          <TabsTrigger value="insights" className="flex items-center gap-1">
+            <Heart className="h-4 w-4" />
+            Insights
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="assessment">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Daily Wellness Check-in</CardTitle>
+                  <CardDescription>
+                    Rate how you're feeling today to track your mental wellbeing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  {/* Mood Slider */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base">Mood</Label>
+                      <span className="text-sm font-medium">
+                        {Object.entries(moodLabels).find(([key]) => Number(key) === moodScore)?.[1] || 'N/A'}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[moodScore]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setMoodScore(value[0])}
+                      className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Very Low</span>
+                      <span>Neutral</span>
+                      <span>Excellent</span>
+                    </div>
+                  </div>
+                  
+                  {/* Anxiety Slider */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base">Anxiety Level</Label>
+                      <span className="text-sm font-medium">
+                        {Object.entries(anxietyLabels).find(([key]) => Number(key) === anxietyLevel)?.[1] || 'N/A'}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[anxietyLevel]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setAnxietyLevel(value[0])}
+                      className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>None</span>
+                      <span>Moderate</span>
+                      <span>Severe</span>
+                    </div>
+                  </div>
+                  
+                  {/* Sleep Quality Slider */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base">Sleep Quality</Label>
+                      <span className="text-sm font-medium">
+                        {Object.entries(sleepLabels).find(([key]) => Number(key) === sleepQuality)?.[1] || 'N/A'}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[sleepQuality]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setSleepQuality(value[0])}
+                      className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Poor</span>
+                      <span>Average</span>
+                      <span>Excellent</span>
+                    </div>
+                  </div>
+                  
+                  {/* Energy Level Slider */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base">Energy Level</Label>
+                      <span className="text-sm font-medium">
+                        {Object.entries(energyLabels).find(([key]) => Number(key) === energyLevel)?.[1] || 'N/A'}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[energyLevel]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setEnergyLevel(value[0])}
+                      className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Exhausted</span>
+                      <span>Neutral</span>
+                      <span>Very Energetic</span>
+                    </div>
+                  </div>
+                  
+                  {/* Focus Level Slider */}
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-base">Focus Level</Label>
+                      <span className="text-sm font-medium">
+                        {Object.entries(focusLabels).find(([key]) => Number(key) === focusLevel)?.[1] || 'N/A'}
+                      </span>
+                    </div>
+                    <Slider
+                      value={[focusLevel]}
+                      min={1}
+                      max={10}
+                      step={1}
+                      onValueChange={(value) => setFocusLevel(value[0])}
+                      className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Distracted</span>
+                      <span>Moderately Focused</span>
+                      <span>Highly Focused</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline">Reset</Button>
+                    <Button>Save Check-in</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Wellness Score</CardTitle>
+                  <CardDescription>
+                    Your overall mental wellness rating
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex flex-col items-center">
+                    <div className="relative h-40 w-40">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-4xl font-bold">{wellnessScore}</div>
+                      </div>
+                      <svg className="h-full w-full" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke="hsl(var(--muted))"
+                          strokeWidth="10"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke={wellnessScore >= 80 ? "hsl(var(--success))" : wellnessScore >= 60 ? "hsl(var(--primary))" : wellnessScore >= 40 ? "hsl(var(--warning))" : "hsl(var(--destructive))"}
+                          strokeWidth="10"
+                          strokeDasharray={`${(wellnessScore / 100) * 283} 283`}
+                          strokeDashoffset="0"
+                          strokeLinecap="round"
+                          transform="rotate(-90 50 50)"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {wellnessScore >= 80 ? "Excellent" : 
+                       wellnessScore >= 60 ? "Good" : 
+                       wellnessScore >= 40 ? "Fair" : 
+                       "Needs Attention"}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Last check-in</span>
+                      <span className="font-medium">Today, 9:41 AM</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>7-day trend</span>
+                      <span className="font-medium text-success">+5 points</span>
+                    </div>
+                  </div>
+                  
+                  <Button onClick={handleConsultAI} className="w-full">
+                    <Brain className="mr-2 h-4 w-4" />
+                    Get AI Recommendations
+                  </Button>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab("meditation")}>
+                    <Waves className="mr-2 h-4 w-4" />
+                    Start Meditation
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab("journal")}>
+                    <LineChart className="mr-2 h-4 w-4" />
+                    Write in Journal
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Calendar className="mr-2 h-4 w-4" />
+                    Schedule Therapy
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="journal">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <motion.div
+                initial={false}
+                animate={entryAnimation === 'editing' ? { 
+                  y: [0, -10, 0],
+                  scale: [1, 1.01, 1]
+                } : {}}
+                transition={{ duration: 1 }}
+              >
+                <Card className="overflow-hidden">
+                  <CardHeader className="relative pb-2">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <CardTitle>Mood Journal</CardTitle>
+                        <CardDescription>
+                          Express your thoughts and feelings to track your emotional wellbeing
+                        </CardDescription>
+                      </div>
+                      {selectedEmoji && (
+                        <motion.div 
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1, rotate: [0, 10, 0, -10, 0] }}
+                          transition={{ duration: 0.5, type: "spring" }}
+                          className="text-3xl"
+                        >
+                          {selectedEmoji}
+                        </motion.div>
+                      )}
+                    </div>
+                    
+                    <div className="absolute top-0 right-0 h-1 w-full bg-gradient-to-r from-transparent via-transparent to-transparent">
+                      {journalSentiment === 'positive' && (
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          className="h-full bg-gradient-to-r from-transparent via-green-500/30 to-green-500"
+                        />
+                      )}
+                      {journalSentiment === 'negative' && (
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          className="h-full bg-gradient-to-r from-transparent via-red-500/30 to-red-500"
+                        />
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <motion.div 
+                            className="flex items-center gap-1 border rounded-full overflow-hidden"
+                            whileHover={{ scale: 1.03 }}
+                            transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                          >
+                            <Button 
+                              variant={timeOfDay === "morning" ? "default" : "ghost"}
+                              size="sm" 
+                              className={`px-3 rounded-none ${timeOfDay === "morning" ? "" : "hover:bg-muted"}`}
+                              onClick={() => setTimeOfDay("morning")}
+                            >
+                              <Sun className="h-4 w-4 mr-1 text-warning" />
+                              <span className="text-xs">Morning</span>
+                            </Button>
+                            <Button 
+                              variant={timeOfDay === "afternoon" ? "default" : "ghost"}
+                              size="sm" 
+                              className={`px-3 rounded-none ${timeOfDay === "afternoon" ? "" : "hover:bg-muted"}`}
+                              onClick={() => setTimeOfDay("afternoon")}
+                            >
+                              <Sun className="h-4 w-4 mr-1 text-orange-500" />
+                              <span className="text-xs">Afternoon</span>
+                            </Button>
+                            <Button 
+                              variant={timeOfDay === "night" ? "default" : "ghost"}
+                              size="sm" 
+                              className={`px-3 rounded-none ${timeOfDay === "night" ? "" : "hover:bg-muted"}`}
+                              onClick={() => setTimeOfDay("night")}
+                            >
+                              <Moon className="h-4 w-4 mr-1 text-blue-500" />
+                              <span className="text-xs">Night</span>
+                            </Button>
+                          </motion.div>
+                          <motion.div
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 w-7 p-0 ml-1"
+                              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            >
+                              <span className="text-lg">😊</span>
+                            </Button>
+                          </motion.div>
+                          
+                          <AnimatePresence>
+                            {showEmojiPicker && (
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                className="absolute mt-8 ml-10 z-50 bg-background shadow-lg rounded-lg border p-2"
+                              >
+                                <div className="grid grid-cols-5 gap-1">
+                                  {["😊", "😂", "🥰", "😌", "🤔", "😢", "😡", "😴", "🥳", "😎"].map(emoji => (
+                                    <motion.button 
+                                      key={emoji}
+                                      className="text-xl hover:bg-muted p-1 rounded"
+                                      onClick={() => handleEmojiSelect(emoji)}
+                                      whileHover={{ scale: 1.2 }}
+                                      whileTap={{ scale: 0.9 }}
+                                    >
+                                      {emoji}
+                                    </motion.button>
+                                  ))}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <motion.div 
+                          initial={false}
+                          animate={
+                            entryAnimation === 'saving' 
+                              ? { y: [0, -5, 0], opacity: [1, 0.7, 1] } 
+                              : {}
+                          }
+                          transition={{ duration: 0.5 }}
+                        >
+                          <Textarea 
+                            ref={textareaRef}
+                            placeholder="Write about your thoughts, feelings, and experiences..." 
+                            className="min-h-[200px] pr-16 transition-all duration-300 border-primary/20 focus-visible:border-primary/50"
+                            value={journalEntry}
+                            onChange={handleJournalChange}
+                          />
+                        </motion.div>
+                        <div className="absolute bottom-2 right-2 text-xs text-muted-foreground">
+                          {journalCharCount} chars
+                        </div>
+                        {journalSentiment === 'positive' && journalEntry.length > 10 && (
+                          <div className="absolute top-2 right-2">
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1, rotate: 360 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                            >
+                              <Sparkles className="h-5 w-5 text-green-500 opacity-70" />
+                            </motion.div>
+                          </div>
+                        )}
+                        {journalSentiment === 'negative' && journalEntry.length > 10 && (
+                          <div className="absolute top-2 right-2">
+                            <motion.div 
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                            >
+                              <AlertCircle className="h-5 w-5 text-red-500 opacity-70" />
+                            </motion.div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <Label>Mood Tags</Label>
+                      <motion.div 
+                        className="flex flex-wrap gap-2"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ staggerChildren: 0.05, delayChildren: 0.1 }}
+                      >
+                        {moodTagsData.map((tag, index) => {
+                          const isSelected = selectedMoodTags.includes(tag.name);
+                          return (
+                            <motion.div
+                              key={tag.name}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ delay: index * 0.02 }}
+                              whileHover={{ 
+                                scale: 1.05, 
+                                y: -2,
+                                transition: { duration: 0.2 } 
+                              }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className={`rounded-full ${tag.color} border ${isSelected ? 'ring-2 ring-offset-1 ring-primary' : ''}`}
+                                onClick={() => toggleMoodTag(tag.name)}
+                              >
+                                {tag.name}
+                                {isSelected && (
+                                  <motion.span
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    exit={{ scale: 0 }}
+                                    className="ml-1"
+                                  >
+                                    ✓
+                                  </motion.span>
+                                )}
+                              </Button>
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    </div>
+                    
+                    <AnimatePresence>
+                      {selectedMoodTags.length > 0 && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0, y: -10 }}
+                          animate={{ opacity: 1, height: 'auto', y: 0 }}
+                          exit={{ opacity: 0, height: 0, y: -10 }}
+                          className="mt-3 p-3 bg-muted/20 rounded-lg"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <h4 className="text-sm font-medium">Selected Feelings:</h4>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => setSelectedMoodTags([])}
+                            >
+                              Clear All
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <AnimatePresence>
+                              {selectedMoodTags.map(tagName => {
+                                const tagInfo = moodTagsData.find(t => t.name === tagName);
+                                
+                                return (
+                                  <motion.div 
+                                    key={tagName}
+                                    initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                                    exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    className={`px-2.5 py-1 rounded-full text-xs flex items-center gap-1 ${tagInfo?.color || ""}`}
+                                  >
+                                    {tagName}
+                                    <motion.button 
+                                      onClick={() => toggleMoodTag(tagName)} 
+                                      className="ml-1 rounded-full hover:bg-foreground/10 p-0.5"
+                                      whileHover={{ rotate: 90 }}
+                                      whileTap={{ scale: 0.8 }}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M18 6 6 18"></path>
+                                        <path d="m6 6 12 12"></path>
+                                      </svg>
+                                    </motion.button>
+                                  </motion.div>
+                                );
+                              })}
+                            </AnimatePresence>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    
+                    <div className="flex justify-end space-x-2">
+                      <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}>
+                        <Button variant="outline">
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Draft
+                        </Button>
+                      </motion.div>
+                      <AnimatePresence>
+                        {!saveAnimation ? (
+                          <motion.div 
+                            whileHover={{ scale: 1.05, boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.1)" }} 
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <Button onClick={handleSaveEntry}>
+                              <Download className="mr-2 h-4 w-4" />
+                              Save Entry
+                            </Button>
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            initial={{ width: 100 }}
+                            animate={{ width: 40 }}
+                            exit={{ width: 100 }}
+                            className="relative"
+                          >
+                            <motion.div
+                              initial={{ opacity: 1 }}
+                              animate={{ opacity: 0 }}
+                              transition={{ delay: 0.5 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <Button className="w-full">
+                                <Download className="mr-2 h-4 w-4" />
+                                Save Entry
+                              </Button>
+                            </motion.div>
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.3 }}
+                              animate={{ opacity: 1, scale: 1, rotate: [0, 360] }}
+                              transition={{ delay: 0.3, type: "spring" }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <div className="bg-primary text-primary-foreground w-10 h-10 rounded-full flex items-center justify-center">
+                                <Check className="h-5 w-5" />
+                              </div>
+                            </motion.div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+            
+            <div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ScrollText className="h-5 w-5" />
+                    Journal History
+                  </CardTitle>
+                  <CardDescription>
+                    Your recent journal entries
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-4">
+                    {journalEntries.slice(0, 3).map((entry, index) => (
+                      <motion.div 
+                        key={entry.id} 
+                        className="border-b pb-4 last:border-0 last:pb-0 relative group"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ 
+                          x: 5,
+                          backgroundColor: "rgba(var(--card), 0.5)",
+                          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)"
+                        }}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <div>
+                            <div className="font-medium text-sm">{formatJournalDate(entry.date)}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {entry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm bg-muted px-2 py-0.5 rounded-full">
+                              {entry.mood[0] || "Neutral"}
+                            </span>
+                            <span className="text-lg">{entry.emoji || ""}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{entry.text}</p>
+                        
+                        <div className="absolute -right-2 top-0 bottom-0 flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <motion.button
+                            className="p-1 bg-background rounded-full shadow-sm mb-1 border"
+                            onClick={() => handleEditEntry(entry.id)}
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <Edit2 className="h-3 w-3 text-blue-500" />
+                          </motion.button>
+                          <motion.button
+                            className="p-1 bg-background rounded-full shadow-sm border"
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            whileHover={{ scale: 1.1, rotate: 5 }}
+                            whileTap={{ scale: 0.9 }}
+                          >
+                            <Trash2 className="h-3 w-3 text-red-500" />
+                          </motion.button>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                  
+                  <motion.div 
+                    whileHover={{ scale: 1.02 }} 
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button 
+                      variant="outline" 
+                      className="w-full"
+                      onClick={() => setShowAllEntries(true)}
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      View All Entries {journalEntries.length > 0 && `(${journalEntries.length})`}
+                    </Button>
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="meditation">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Guided Meditation</CardTitle>
+                  <CardDescription>
+                    Take a moment to relax and focus on your breathing
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-8">
+                  <div className="flex flex-col items-center">
+                    <div className="relative h-64 w-64">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-4xl font-bold">{formatTime(remainingTime)}</div>
+                      </div>
+                      <svg className="h-full w-full" viewBox="0 0 100 100">
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke="hsl(var(--muted))"
+                          strokeWidth="10"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="45"
+                          fill="none"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth="10"
+                          strokeDasharray="283"
+                          strokeDashoffset={`${(1 - remainingTime / meditationTime) * 283}`}
+                          strokeLinecap="round"
+                          transform="rotate(-90 50 50)"
+                        />
+                      </svg>
+                      
+                      {/* Breathing animation */}
+                      {isPlaying && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="h-32 w-32 rounded-full bg-primary/10 animate-pulse" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-center space-x-4">
+                    <Button variant="outline" size="icon" onClick={resetMeditation}>
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                    <Button size="lg" onClick={toggleMeditation}>
+                      {isPlaying ? (
+                        <>
+                          <PauseCircle className="mr-2 h-5 w-5" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-5 w-5" />
+                          Start
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Label>Duration</Label>
+                    <div className="flex justify-between gap-4">
+                      {[1, 3, 5, 10, 15, 20].map((minutes) => (
+                        <Button 
+                          key={minutes} 
+                          variant={meditationTime === minutes * 60 ? "default" : "outline"}
+                          onClick={() => setMeditationDuration(minutes)}
+                          className="flex-1"
+                        >
+                          {minutes} min
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <Label>Ambient Sound</Label>
+                    <RadioGroup value={selectedSound} onValueChange={setSelectedSound} className="grid grid-cols-2 gap-4">
+                      <div>
+                        <RadioGroupItem value="rain" id="rain" className="peer sr-only" />
+                        <Label
+                          htmlFor="rain"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <Waves className="mb-3 h-6 w-6" />
+                          Rain
+                        </Label>
+                      </div>
+                      <div>
+                        <RadioGroupItem value="forest" id="forest" className="peer sr-only" />
+                        <Label
+                          htmlFor="forest"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <Waves className="mb-3 h-6 w-6" />
+                          Forest
+                        </Label>
+                      </div>
+                      <div>
+                        <RadioGroupItem value="ocean" id="ocean" className="peer sr-only" />
+                        <Label
+                          htmlFor="ocean"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <Waves className="mb-3 h-6 w-6" />
+                          Ocean
+                        </Label>
+                      </div>
+                      <div>
+                        <RadioGroupItem value="white-noise" id="white-noise" className="peer sr-only" />
+                        <Label
+                          htmlFor="white-noise"
+                          className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"
+                        >
+                          <Volume2 className="mb-3 h-6 w-6" />
+                          White Noise
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Meditation Stats</CardTitle>
+                  <CardDescription>
+                    Your meditation journey
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted rounded-lg p-4 text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Total Sessions</p>
+                      <p className="text-2xl font-bold">24</p>
+                    </div>
+                    <div className="bg-muted rounded-lg p-4 text-center">
+                      <p className="text-sm text-muted-foreground mb-1">This Week</p>
+                      <p className="text-2xl font-bold">3</p>
+                    </div>
+                    <div className="bg-muted rounded-lg p-4 text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Total Minutes</p>
+                      <p className="text-2xl font-bold">187</p>
+                    </div>
+                    <div className="bg-muted rounded-lg p-4 text-center">
+                      <p className="text-sm text-muted-foreground mb-1">Longest Streak</p>
+                      <p className="text-2xl font-bold">5 days</p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Current streak</span>
+                      <span className="font-medium">2 days</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Last session</span>
+                      <span className="font-medium">Yesterday</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recommended Sessions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {[
+                    { title: "Stress Relief", duration: "10 min", type: "Guided" },
+                    { title: "Better Sleep", duration: "15 min", type: "Guided" },
+                    { title: "Focus & Concentration", duration: "5 min", type: "Unguided" },
+                  ].map((session, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{session.title}</p>
+                        <div className="flex items-center text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 mr-1" />
+                          <span>{session.duration}</span>
+                          <span className="mx-2">•</span>
+                          <span>{session.type}</span>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon">
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="insights">
+          <WellnessDashboard 
+            moodScore={moodScore}
+            anxietyLevel={anxietyLevel}
+            sleepQuality={sleepQuality}
+            energyLevel={energyLevel}
+            focusLevel={focusLevel}
+          />
+        </TabsContent>
+      </Tabs>
+      {showAllEntries && (
+        <Dialog open={showAllEntries} onOpenChange={setShowAllEntries}>
+          <DialogContent className="max-w-3xl max-h-[80vh]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Journal History
+              </DialogTitle>
+              <DialogDescription>
+                All your saved journal entries
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="h-[60vh] pr-4">
+              <div className="space-y-4 pt-2">
+                {journalEntries.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1, y: [10, 0] }}
+                      transition={{ duration: 0.5 }}
+                    >
+                      <Archive className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+                      <p>No journal entries yet. Start writing to track your mood journey!</p>
+                    </motion.div>
+                  </div>
+                ) : (
+                  journalEntries.map((entry, index) => (
+                    <motion.div 
+                      key={entry.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      whileHover={{ 
+                        y: -2,
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.08)",
+                        backgroundColor: "var(--background)",
+                        borderColor: "var(--primary)"
+                      }}
+                      className="border rounded-lg p-4 space-y-3 relative group"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{formatJournalDate(entry.date)}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {entry.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            {entry.timeOfDay === "morning" && <Sun className="h-4 w-4 text-warning" />}
+                            {entry.timeOfDay === "afternoon" && <Sun className="h-4 w-4 text-orange-500" />}
+                            {entry.timeOfDay === "night" && <Moon className="h-4 w-4 text-blue-500" />}
+                            <span className="text-sm capitalize">{entry.timeOfDay}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {entry.emoji && (
+                            <motion.span 
+                              className="text-xl"
+                              whileHover={{ scale: 1.3, rotate: [0, 10, -10, 0] }}
+                              transition={{ duration: 0.5 }}
+                            >
+                              {entry.emoji}
+                            </motion.span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {entry.mood.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {entry.mood.map((tag, tagIndex) => {
+                            const tagInfo = moodTagsData.find(t => t.name === tag);
+                            return (
+                              <motion.span 
+                                key={tag} 
+                                className={`px-2 py-0.5 rounded-full text-xs ${tagInfo?.color || ""}`}
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ delay: tagIndex * 0.05 + 0.1 }}
+                                whileHover={{ scale: 1.1 }}
+                              >
+                                {tag}
+                              </motion.span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      <p className="text-sm whitespace-pre-wrap">{entry.text}</p>
+                      
+                      <div className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                        <motion.button
+                          className="p-1.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                          onClick={() => {
+                            handleEditEntry(entry.id);
+                            setShowAllEntries(false);
+                          }}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </motion.button>
+                        <motion.button
+                          className="p-1.5 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
