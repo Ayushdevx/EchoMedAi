@@ -68,14 +68,11 @@
     "gsap": "^3.12.7",
     "input-otp": "^1.2.4",
     "jspdf": "^2.5.2",
-<<<<<<< HEAD
-    "leva": "^0.10.0",
-=======
     "leaflet": "^1.9.4",
     "leaflet.heat": "^0.2.0",
->>>>>>> b7d449a2dad5b0ba4abaeff77a53bcb879662189
+    "leva": "^0.10.0",
     "lucide-react": "^0.446.0",
-    "next": "^15.2.1",
+    "next": "13.5.1",
     "next-themes": "^0.3.0",
     "pdf-lib": "^1.17.1",
     "postcss": "8.4.30",

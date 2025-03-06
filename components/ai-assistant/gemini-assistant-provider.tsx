@@ -19,7 +19,7 @@ import {
   setSpeechPitch,
   setSpeechVolume
 } from "@/lib/speechService";
-import { Volume2, VolumeX, PlayCircle, StopCircle, Settings } from "lucide-react";
+import { Volume2, VolumeX, PlayCircle, StopCircle, Settings, Trash2 } from "lucide-react";
 import {
   Popover,
   PopoverContent,

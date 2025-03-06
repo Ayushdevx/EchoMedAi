@@ -119,7 +119,9 @@ export async function runDiagnostic(): Promise<DiagnosticResult> {
         
         // Generate content
         console.log("🔄 Generating content...");
-        const generationResult = await model.generateContent(prompt);
+        const generationResult = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }]
+        });
         const response = generationResult.response;
         const text = response.text();
         

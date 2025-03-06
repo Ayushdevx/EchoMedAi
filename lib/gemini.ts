@@ -1,33 +1,19 @@
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize the Gemini API with your API key
-// Using a valid Gemini API key - you should replace this with your own in production
-const genAI = new GoogleGenerativeAI("AIzaSyDJC5a882ruaC4XL6ejY1yhgRkN-JNQKg8");
+// Get API key from environment variables
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY || "";
 
-// Safety settings to filter out harmful content
-const safetySettings = [
-  {
-    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-  {
-    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-  },
-];
+// Basic debugging
+if (!API_KEY) {
+  console.error("No API key found for Gemini API");
+}
+
+// Initialize the API
+const genAI = new GoogleGenerativeAI(API_KEY);
 
 // Get the Gemini Pro model
 export const geminiModel = genAI.getGenerativeModel({
-  model: "gemini-pro",
-  safetySettings,
+  model: "gemini-pro"
 });
 
 // Healthcare system prompt for the AI assistant
@@ -60,21 +46,15 @@ Remember: You are a supportive healthcare assistant, but always emphasize the im
 // Function to generate a chat response
 export async function generateChatResponse(messages: { role: string; content: string }[]) {
   try {
-    const chat = geminiModel.startChat({
-      history: messages.slice(0, -1),
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-      },
-    });
-
     const lastMessage = messages[messages.length - 1];
-    const result = await chat.sendMessage(lastMessage.content);
-    const response = await result.response;
+    const result = await geminiModel.generateContent(lastMessage.content);
+    const response = result.response;
     return response.text();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating chat response:", error);
+    console.error("Error message:", error.message);
+    console.error("Error name:", error.name);
+    console.error("Stack trace:", error.stack);
     return "I'm sorry, I encountered an error processing your request. Please try again later.";
   }
 }
@@ -85,28 +65,24 @@ export async function generateStreamingChatResponse(
   onStreamUpdate: (text: string) => void
 ) {
   try {
-    const chat = geminiModel.startChat({
-      history: messages.slice(0, -1),
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.95,
-        topK: 40,
-      },
-    });
-
     const lastMessage = messages[messages.length - 1];
-    const result = await chat.sendMessageStream(lastMessage.content);
+    const result = await geminiModel.generateContentStream(lastMessage.content);
 
-    let fullResponse = "";
+    let accumulatedResponse = "";
+
     for await (const chunk of result.stream) {
       const chunkText = chunk.text();
-      fullResponse += chunkText;
-      onStreamUpdate(fullResponse);
+      accumulatedResponse += chunkText;
+      onStreamUpdate(accumulatedResponse);
     }
 
-    return fullResponse;
-  } catch (error) {
+    return accumulatedResponse;
+  } catch (error: any) {
     console.error("Error generating streaming chat response:", error);
+    console.error("Error message:", error.message);
+    console.error("Error name:", error.name);
+    console.error("Stack trace:", error.stack);
+    
     const errorMessage = "I'm sorry, I encountered an error processing your request. Please try again later.";
     onStreamUpdate(errorMessage);
     return errorMessage;

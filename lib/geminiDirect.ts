@@ -6,15 +6,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateFallbackResponse } from "./fallbackResponses";
 
-// Use API key from environment variables
+// Get API key from environment variables
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_GEMINI_API_KEY || "";
+
+// Basic debugging
+if (!API_KEY) {
+  console.error("No API key found for Gemini API");
+}
 
 // Healthcare system prompt - simplified version
 const SYSTEM_PROMPT = `
-You are Dr. Echo, an AI healthcare assistant. Provide helpful, accurate health information.
-Always clarify you're not a replacement for professional medical care.
-For emergencies, advise seeking immediate medical attention.
-Base your responses on medical evidence and best practices.
+You are a helpful medical AI assistant. Provide clear and helpful information to users while being careful not to make 
+definitive medical diagnoses or recommend specific treatments unless you're quoting established medical guidelines.
+Always recommend consulting with a healthcare professional for specific medical advice or concerns.
 `;
 
 /**
@@ -23,46 +27,32 @@ Base your responses on medical evidence and best practices.
  */
 export async function getAIResponse(userMessage: string): Promise<string> {
   try {
-    console.log("📡 Sending request to Gemini API...");
-    
-    // Check if API key is available
-    if (!API_KEY) {
-      console.warn("⚠️ No API key found. Using fallback response.");
-      return generateFallbackResponse(userMessage);
-    }
-    
     // Full prompt combining system instructions and user message
     const fullPrompt = `${SYSTEM_PROMPT}\n\nUser query: ${userMessage}\n\nYour response:`;
     
-    // Initialize the Gemini API with API key from environment variables
+    // Initialize the Gemini API
     const genAI = new GoogleGenerativeAI(API_KEY);
     
-    // Get the generative model - simplest configuration
+    // Get the generative model
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 1024,
-      },
+      model: "gemini-pro"
     });
     
-    // Generate content with error handling
-    try {
-      const result = await model.generateContent(fullPrompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      console.log("✅ Received response from Gemini API");
-      return text;
-    } catch (apiError) {
-      console.error("❌ API Error:", apiError);
-      // Use fallback response based on user message
-      return generateFallbackResponse(userMessage);
-    }
-  } catch (error) {
-    console.error("❌ Error in getAIResponse:", error);
+    // Generate content with error handling - proper format
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }]
+    });
+    
+    // Process the response
+    const response = result.response;
+    const text = response.text();
+    
+    return text;
+  } catch (error: any) {
+    console.error("Error in getAIResponse:", error);
+    console.error("Error details:", error.message);
+    
+    // Return a fallback response when the API fails
     return generateFallbackResponse(userMessage);
   }
 }
@@ -76,55 +66,37 @@ export async function getStreamingAIResponse(
   onUpdate: (text: string) => void
 ): Promise<string> {
   try {
-    console.log("📡 Sending streaming request to Gemini API...");
-    
-    // Check if API key is available
-    if (!API_KEY) {
-      console.warn("⚠️ No API key found. Using fallback response.");
-      const fallbackResponse = generateFallbackResponse(userMessage);
-      onUpdate(fallbackResponse);
-      return fallbackResponse;
-    }
-    
     // Full prompt combining system instructions and user message
     const fullPrompt = `${SYSTEM_PROMPT}\n\nUser query: ${userMessage}\n\nYour response:`;
     
-    // Initialize the Gemini API with API key from environment variables
+    // Initialize the Gemini API
     const genAI = new GoogleGenerativeAI(API_KEY);
     
-    // Get the generative model - simplest configuration
+    // Get the generative model
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.8,
-        topK: 40,
-        maxOutputTokens: 1024,
-      },
+      model: "gemini-pro"
     });
     
-    // Generate streaming content with error handling
-    try {
-      const result = await model.generateContentStream(fullPrompt);
-      
-      let fullResponse = "";
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        fullResponse += chunkText;
-        onUpdate(fullResponse);
-      }
-      
-      console.log("✅ Completed streaming response");
-      return fullResponse;
-    } catch (streamError) {
-      console.error("❌ API Streaming Error:", streamError);
-      // Use a fallback response specific to the user's message
-      const fallbackResponse = generateFallbackResponse(userMessage);
-      onUpdate(fallbackResponse);
-      return fallbackResponse;
+    // Generate streaming content with error handling - proper format
+    const result = await model.generateContentStream({
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }]
+    });
+    
+    // Process the streaming response
+    let fullResponse = "";
+    
+    for await (const chunk of result.stream) {
+      const partialResponse = chunk.text();
+      fullResponse += partialResponse;
+      onUpdate(fullResponse);
     }
-  } catch (error) {
-    console.error("❌ Error in getStreamingAIResponse:", error);
+    
+    return fullResponse;
+  } catch (error: any) {
+    console.error("Error in getStreamingAIResponse:", error);
+    console.error("Error details:", error.message);
+    
+    // Return a fallback response when the API fails
     const fallbackResponse = generateFallbackResponse(userMessage);
     onUpdate(fallbackResponse);
     return fallbackResponse;
