@@ -517,7 +517,7 @@ Could you provide personalized fitness and nutrition recommendations to help me 
                             <p className="text-sm font-medium">{caloriesConsumed}</p>
                           </div>
                         </div>
-                        <Progress value={(caloriesBurned / calorieGoal) * 100} className="h-2 mt-2" indicatorColor="bg-chart-2" />
+                        <Progress value={(caloriesBurned / calorieGoal) * 100} className="h-2 mt-2 [&>div]:bg-chart-2" />
                       </CardContent>
                     </Card>
                     
@@ -538,7 +538,7 @@ Could you provide personalized fitness and nutrition recommendations to help me 
                             <p className="text-sm font-medium">{activeMinutesGoal} min</p>
                           </div>
                         </div>
-                        <Progress value={(activeMinutes / activeMinutesGoal) * 100} className="h-2 mt-2" indicatorColor="bg-chart-3" />
+                        <Progress value={(activeMinutes / activeMinutesGoal) * 100} className="h-2 mt-2 [&>div]:bg-chart-3" />
                       </CardContent>
                     </Card>
                   </div>
@@ -1542,7 +1542,7 @@ Could you provide personalized fitness and nutrition recommendations to help me 
                           <p className="text-sm text-muted-foreground">Protein</p>
                           <p className="text-xl font-bold">110g</p>
                           <p className="text-xs text-muted-foreground">of 120g goal</p>
-                          <Progress value={(110 / 120) * 100} className="h-2 mt-2 w-full" indicatorColor="bg-chart-2" />
+                          <Progress value={(110 / 120) * 100} className="h-2 mt-2 w-full [&>div]:bg-chart-2" />
                         </div>
                       </CardContent>
                     </Card>
@@ -1556,7 +1556,7 @@ Could you provide personalized fitness and nutrition recommendations to help me 
                           <p className="text-sm text-muted-foreground">Carbs</p>
                           <p className="text-xl font-bold">190g</p>
                           <p className="text-xs text-muted-foreground">of 220g goal</p>
-                          <Progress value={(190 / 220) * 100} className="h-2 mt-2 w-full" indicatorColor="bg-chart-3" />
+                          <Progress value={(190 / 220) * 100} className="h-2 mt-2 w-full [&>div]:bg-chart-3" />
                         </div>
                       </CardContent>
                     </Card>
@@ -1570,7 +1570,7 @@ Could you provide personalized fitness and nutrition recommendations to help me 
                           <p className="text-sm text-muted-foreground">Fat</p>
                           <p className="text-xl font-bold">63g</p>
                           <p className="text-xs text-muted-foreground">of 70g goal</p>
-                          <Progress value={(63 / 70) * 100} className="h-2 mt-2 w-full" indicatorColor="bg-chart-4" />
+                          <Progress value={(63 / 70) * 100} className="h-2 mt-2 w-full [&>div]:bg-chart-4" />
                         </div>
                       </CardContent>
                     </Card>

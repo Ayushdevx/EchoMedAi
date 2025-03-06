@@ -25,13 +25,8 @@ type DirectGeminiChatProps = {
   onClose?: () => void;
 };
 
-// Speech recognition type
-declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-  }
-}
+// Import the SpeechRecognition types from gemini.ts instead of redefining them here
+// This file will now use the same types as defined in lib/gemini.ts
 
 export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
   const [messages, setMessages] = useState<Message[]>([
@@ -56,7 +51,8 @@ export default function DirectGeminiChat({ onClose }: DirectGeminiChatProps) {
   // Initialize speech recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Add type assertion for SpeechRecognition
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
         recognition.current = new SpeechRecognition();
         recognition.current.continuous = true;

@@ -60,8 +60,14 @@ Remember: You are a supportive healthcare assistant, but always emphasize the im
 // Function to generate a chat response
 export async function generateChatResponse(messages: { role: string; content: string }[]) {
   try {
+    // Transform messages to the format expected by Gemini API
+    const formattedHistory = messages.slice(0, -1).map(message => ({
+      role: message.role === 'user' ? 'user' : 'model',
+      parts: [{ text: message.content }],
+    }));
+
     const chat = geminiModel.startChat({
-      history: messages.slice(0, -1),
+      history: formattedHistory,
       generationConfig: {
         temperature: 0.7,
         topP: 0.95,
@@ -85,8 +91,14 @@ export async function generateStreamingChatResponse(
   onStreamUpdate: (text: string) => void
 ) {
   try {
+    // Transform messages to the format expected by Gemini API
+    const formattedHistory = messages.slice(0, -1).map(message => ({
+      role: message.role === 'user' ? 'user' : 'model',
+      parts: [{ text: message.content }],
+    }));
+
     const chat = geminiModel.startChat({
-      history: messages.slice(0, -1),
+      history: formattedHistory,
       generationConfig: {
         temperature: 0.7,
         topP: 0.95,
@@ -113,10 +125,4 @@ export async function generateStreamingChatResponse(
   }
 }
 
-// Add type definitions for the Web Speech API
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
+// SpeechRecognition type definitions moved to /types/speech-recognition.d.ts
